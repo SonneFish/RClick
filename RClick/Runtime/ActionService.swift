@@ -48,9 +48,22 @@ final class ActionService {
         let appUrl = rcitem.url
         logger.debug("openApp: rid=\(rid) app=\(appUrl.path) target=\(target) opensNewInstance=\(rcitem.opensNewInstance)")
 
+        // 「选中文件时打开所在目录」：每应用显式开关优先，未手动设置时按预设终端分类兜底；
+        // 编辑器 / Git 客户端等保持原样（打开文件本身才是预期）
+        let bundleID = Bundle(url: appUrl)?.bundleIdentifier
+        let opensContainingDir = rcitem.opensContainingDir
+            ?? bundleID.map { AppPresets.terminalBundleIDs.contains($0) }
+            ?? false
+
         for dirPath in target {
             let decodedPath = dirPath.removingPercentEncoding ?? dirPath
-            let url = URL(fileURLWithPath: decodedPath)
+            var url = URL(fileURLWithPath: decodedPath)
+            if opensContainingDir {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue {
+                    url = url.deletingLastPathComponent()
+                }
+            }
             await openWithApp(url, appUrl: appUrl, opensNewInstance: rcitem.opensNewInstance)
         }
     }

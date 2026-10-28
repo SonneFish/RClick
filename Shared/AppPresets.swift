@@ -21,6 +21,9 @@ struct AppPreset {
     let nameKey: String
     let bundleID: String
     let symbol: String
+    /// 终端类应用：选中文件交给它们时，应转换为打开文件所在目录
+    /// （与 OpenInTerminal 行为一致；编辑器 / Git 客户端打开文件本身才是预期）
+    var isTerminal: Bool = false
 }
 
 enum AppPresets {
@@ -28,15 +31,15 @@ enum AppPresets {
     /// 预设应用清单（分组无关，按用途排列）
     static let all: [AppPreset] = [
         // 终端
-        AppPreset(nameKey: "Terminal", bundleID: "com.apple.Terminal", symbol: "terminal"),
-        AppPreset(nameKey: "iTerm2", bundleID: "com.googlecode.iterm2", symbol: "terminal"),
-        AppPreset(nameKey: "Warp", bundleID: "dev.warp.Warp-Stable", symbol: "terminal"),
-        AppPreset(nameKey: "Ghostty", bundleID: "com.mitchellh.ghostty", symbol: "terminal"),
-        AppPreset(nameKey: "kitty", bundleID: "net.kovidgoyal.kitty", symbol: "terminal"),
-        AppPreset(nameKey: "Alacritty", bundleID: "org.alacritty", symbol: "terminal"),
-        AppPreset(nameKey: "WezTerm", bundleID: "com.github.wez.wezterm", symbol: "terminal"),
-        AppPreset(nameKey: "Tabby", bundleID: "org.tabby", symbol: "terminal"),
-        AppPreset(nameKey: "Hyper", bundleID: "co.zeit.hyper", symbol: "terminal"),
+        AppPreset(nameKey: "Terminal", bundleID: "com.apple.Terminal", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "iTerm2", bundleID: "com.googlecode.iterm2", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "Warp", bundleID: "dev.warp.Warp-Stable", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "Ghostty", bundleID: "com.mitchellh.ghostty", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "kitty", bundleID: "net.kovidgoyal.kitty", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "Alacritty", bundleID: "org.alacritty", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "WezTerm", bundleID: "com.github.wez.wezterm", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "Tabby", bundleID: "org.tabby", symbol: "terminal", isTerminal: true),
+        AppPreset(nameKey: "Hyper", bundleID: "co.zeit.hyper", symbol: "terminal", isTerminal: true),
         // 编辑器
         AppPreset(nameKey: "Visual Studio Code", bundleID: "com.microsoft.VSCode", symbol: "chevron.left.forwardslash.chevron.right"),
         AppPreset(nameKey: "Cursor", bundleID: "com.todesktop.230313mzl4w4u92", symbol: "chevron.left.forwardslash.chevron.right"),
@@ -62,6 +65,9 @@ enum AppPresets {
     static func installedURL(for preset: AppPreset) -> URL? {
         NSWorkspace.shared.urlForApplication(withBundleIdentifier: preset.bundleID)
     }
+
+    /// 终端类预设的 bundleID 集合：打开应用时判断是否做「文件 → 所在目录」转换
+    static let terminalBundleIDs: Set<String> = Set(all.filter { $0.isTerminal }.map { $0.bundleID })
 
     /// bundleID → SF Symbol 名（未收录的应用返回 nil，简单图标模式下回落到原始图标）
     private static let symbolByBundleID: [String: String] = {

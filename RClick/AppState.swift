@@ -135,6 +135,17 @@ class AppState: ObservableObject, ActionStateProviding {
         }
     }
 
+    /// 更新某个应用的「选中文件时打开所在目录」开关（`nil` 恢复为跟随预设终端分类）
+    @MainActor
+    func updateAppOpensContainingDir(id: String, value: Bool?) {
+        if let index = apps.firstIndex(where: { $0.id == id }) {
+            var updatedApp = apps[index]
+            updatedApp.opensContainingDir = value
+            apps[index] = updatedApp
+            persist()
+        }
+    }
+
     func getAppItem(rid: String) -> OpenWithApp? {
         return apps.first { rid == $0.id }
     }

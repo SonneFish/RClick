@@ -4494,6 +4494,41 @@
         }
       }
     },
+    "Open Containing Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Containing Folder"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir carpeta contenedora"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir le dossier contenant"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "親フォルダを開く"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开所在目录"
+          }
+        }
+      }
+    },
     "Open in a new window": {
       "extractionState": "manual",
       "localizations": {
@@ -7002,6 +7037,41 @@
           "stringUnit": {
             "state": "translated",
             "value": "警告"
+          }
+        }
+      }
+    },
+    "When a file is selected, open its containing folder instead": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a file is selected, open its containing folder instead"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al seleccionar un archivo, abre su carpeta contenedora"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lorsqu’un fichier est sélectionné, ouvre son dossier parent"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイル選択時はその親フォルダを開きます"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选中文件时，改为打开其所在目录"
           }
         }
       }
