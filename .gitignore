@@ -58,3 +58,5 @@ playground.xcworkspace
 output/*
 Build/
 DerivedData/
+# macOS
+.DS_Store
