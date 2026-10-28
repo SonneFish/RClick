@@ -22,6 +22,10 @@ final class AppEntity {
     var isEnabled: Bool
     /// 注意：必须带默认值，否则 SwiftData 迁移旧库（已有数据）时无法为旧行赋值而失败
     var opensNewInstance: Bool = false
+    /// 是否在 Finder 自定义工具栏菜单中显示（带默认值，原因同上）
+    var showInToolbar: Bool = true
+    /// 是否在右键菜单中显示（带默认值，原因同上）
+    var showInContextMenu: Bool = true
     var createdAt: Date
     var updatedAt: Date
 
@@ -34,7 +38,9 @@ final class AppEntity {
          environment: [String: String] = [:],
          sortOrder: Int = 0,
          isEnabled: Bool = true,
-         opensNewInstance: Bool = false) {
+         opensNewInstance: Bool = false,
+         showInToolbar: Bool = true,
+         showInContextMenu: Bool = true) {
         self.id = id
         self.urlString = url.path(percentEncoded: false)
         self.itemName = itemName
@@ -43,6 +49,8 @@ final class AppEntity {
         self.sortOrder = sortOrder
         self.isEnabled = isEnabled
         self.opensNewInstance = opensNewInstance
+        self.showInToolbar = showInToolbar
+        self.showInContextMenu = showInContextMenu
         self.createdAt = Date()
         self.updatedAt = Date()
 
@@ -90,7 +98,9 @@ final class AppEntity {
             arguments: openWithApp.arguments,
             environment: openWithApp.environment,
             sortOrder: sortOrder,
-            opensNewInstance: openWithApp.opensNewInstance
+            opensNewInstance: openWithApp.opensNewInstance,
+            showInToolbar: openWithApp.showInToolbar,
+            showInContextMenu: openWithApp.showInContextMenu
         )
     }
 }
