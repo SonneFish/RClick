@@ -228,7 +228,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
     /// 合并，无数据竞争。NSWorkspace.icon(forFile:) 官方文档标注为线程安全。
     private func preloadIcons(for config: MenuConfigPayload) {
         let apps = config.apps
-        guard !apps.isEmpty else { return }
+        let newFiles = config.newFiles
         DispatchQueue.global(qos: .utility).async {
             var warmed: [String: NSImage] = [:]
             for app in apps {
@@ -237,13 +237,21 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 let icon = NSWorkspace.shared.icon(forFile: url)
                 if icon.size.width > 0 { warmed[key] = icon }
             }
-            guard !warmed.isEmpty else { return }
+            // 新建文件图标：iconProvider 首次构建会同步查询 NSWorkspace（实测首次 30-40ms），
+            // 同样在后台预热，主线程只做合并
+            let warmedFiles = newFiles.isEmpty
+                ? [:]
+                : FileTypeIconProvider.shared.computeWorkspaceIcons(forExts: newFiles.map { $0.ext })
+            // symbol 名查表（Info.plist 磁盘读取）+ SF Symbol 渲染管线初始化
+            AppPresets.prewarm(forAppPaths: apps.compactMap { $0.appURL })
+            guard !warmed.isEmpty || !warmedFiles.isEmpty else { return }
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 for (key, icon) in warmed where self.iconCache[key] == nil {
                     self.iconCache[key] = icon
                 }
-                logger.debug("图标预热完成: \(warmed.count) 项")
+                FileTypeIconProvider.shared.mergeWarmedIcons(warmedFiles)
+                logger.debug("图标预热完成: app \(warmed.count) 项, file \(warmedFiles.count) 项")
             }
         }
     }
@@ -341,15 +349,9 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         return templateSymbol(app.icon)
     }
 
-    /// 加载 SF Symbol 并使用 hierarchicalColor 适配亮色/暗色模式（带缓存）
+    /// 加载 SF Symbol 作为菜单图标（每次现做，不走缓存——见 MenuSymbolIcon 注释）
     private func templateSymbol(_ name: String) -> NSImage? {
-        let cacheKey = "sf:\(name)"
-        if let cached = iconCache[cacheKey] { return cached }
-        let config = NSImage.SymbolConfiguration(hierarchicalColor: .labelColor)
-        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) else { return nil }
-        iconCache[cacheKey] = image
-        return image
+        MenuSymbolIcon.image(named: name)
     }
 
     /// 从 Assets 或 SF Symbol 加载图标（带缓存）
@@ -357,17 +359,14 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         let cacheKey = "load:\(iconName)"
         if let cached = iconCache[cacheKey] { return cached }
         if let icon = NSImage(named: iconName) {
+            // Assets 位图不受系统外观影响，可以缓存
             iconCache[cacheKey] = icon
             return icon
         }
-        if let icon = templateSymbol(iconName) {
-            iconCache[cacheKey] = icon
-            return icon
-        }
-        if let fallback = iconFallbackMap[iconName],
-           let icon = templateSymbol(fallback) {
-            iconCache[cacheKey] = icon
-            return icon
+        // SF Symbol 兜底：颜色依赖系统当前主题，实例不能缓存（见 MenuSymbolIcon 注释）
+        if let icon = templateSymbol(iconName) { return icon }
+        if let fallback = iconFallbackMap[iconName] {
+            return templateSymbol(fallback)
         }
         return nil
     }

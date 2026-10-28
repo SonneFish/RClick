@@ -57,25 +57,40 @@ final class FileTypeIconProvider: @unchecked Sendable {
             return icon
         }
 
-        // 3. SF Symbol 回退：先解析旧 PNG 图标名映射，再尝试直接匹配
+        // 3. SF Symbol 回退：先解析旧 PNG 图标名映射，再尝试直接匹配。
+        //    不缓存——符号图颜色依赖系统主题，缓存的实例会把颜色固化（明暗切换后过期）
         let resolvedSymbol = iconFallbackMap[fallbackSymbol] ?? fallbackSymbol
-        if let icon = sfSymbolIcon(named: resolvedSymbol) {
-            cache[ext] = icon
-            return icon
-        }
-
-        // 4. 最终兜底
-        if let icon = sfSymbolIcon(named: "doc") {
-            cache[ext] = icon
-            return icon
-        }
-
-        return nil
+        return MenuSymbolIcon.image(named: resolvedSymbol, pointSize: iconSize)
+            ?? MenuSymbolIcon.image(named: "doc", pointSize: iconSize)
     }
 
     /// 清除缓存（菜单配置更新时调用）
     func clearCache() {
         cache.removeAll()
+    }
+
+    /// 后台预热：批量计算扩展名对应的工作区图标（UTType + NSWorkspace 查询，首次很贵）。
+    /// 只做 icon(for:) 的第 1 级（系统图标）；无专属图标的扩展名留给 png/symbol 兜底。
+    /// 返回结果经主线程 mergeWarmedIcons 合并，避免与菜单构建竞争 cache。
+    func computeWorkspaceIcons(forExts exts: [String]) -> [String: NSImage] {
+        var result: [String: NSImage] = [:]
+        for ext in exts {
+            let cleanExt = ext.hasPrefix(".") ? String(ext.dropFirst()) : ext
+            guard !cleanExt.isEmpty else { continue }
+            let contentType = UTType(filenameExtension: cleanExt) ?? .data
+            let icon = NSWorkspace.shared.icon(for: contentType)
+            // 与 workspaceIcon 相同的判定：拿不到专属图标（通用灰图标）就跳过
+            guard icon !== NSWorkspace.shared.icon(for: .data) else { continue }
+            result[ext] = icon.resized(to: NSSize(width: iconSize, height: iconSize))
+        }
+        return result
+    }
+
+    /// 合并后台预热结果（主线程调用）；已有缓存不覆盖
+    func mergeWarmedIcons(_ icons: [String: NSImage]) {
+        for (ext, icon) in icons where cache[ext] == nil {
+            cache[ext] = icon
+        }
     }
 
     // MARK: - Private
@@ -118,11 +133,20 @@ final class FileTypeIconProvider: @unchecked Sendable {
         return image.resized(to: NSSize(width: iconSize, height: iconSize))
     }
 
-    /// SF Symbol 图标（自动适配明暗模式）
-    private func sfSymbolIcon(named name: String) -> NSImage? {
-        let colorConfig = NSImage.SymbolConfiguration(paletteColors: [.labelColor])
-        let sizeConfig = NSImage.SymbolConfiguration(pointSize: iconSize, weight: .regular)
-        let config = colorConfig.applying(sizeConfig)
+}
+
+// MARK: - Menu Symbol Icon
+
+/// FinderSync 菜单符号图标：菜单由 Finder 跨进程渲染，缓存的图片实例会把首次解析的
+/// 颜色固化，系统明暗切换后不刷新；template / labelColor 等动态方案在跨进程下同样不可靠。
+/// 因此每次调用现做图片，颜色按系统当前主题（AppleInterfaceStyle 全局偏好）显式选死。
+enum MenuSymbolIcon {
+    static func image(named name: String, pointSize: CGFloat? = nil) -> NSImage? {
+        let isDark = (CFPreferencesCopyAppValue("AppleInterfaceStyle" as CFString, kCFPreferencesAnyApplication) as? String) == "Dark"
+        var config = NSImage.SymbolConfiguration(paletteColors: [isDark ? NSColor.white : NSColor.black])
+        if let pointSize {
+            config = config.applying(NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular))
+        }
         return NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(config)
     }

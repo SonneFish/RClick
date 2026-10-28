@@ -79,30 +79,36 @@ enum AppPresets {
         Dictionary(all.map { ($0.bundleID, $0.nameKey) }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// 「简单图标」缓存：进程内复用（bundleID 读取要打开 Info.plist，
-    /// 菜单构建在主线程上，不能每次都读盘）。
-    private static let simpleIconCache = LockedSimpleIconCache()
+    /// 「简单图标」的 symbol 名缓存：只缓存 bundleID→symbol 查表结果（要打开 Info.plist，
+    /// 菜单构建在主线程上，不能每次都读盘），NSImage 本体不缓存。
+    private static let symbolNameCache = LockedSymbolNameCache()
+
+    /// 查表（带缓存）：bundleID 读取要打开 Info.plist，预热与菜单构建共用同一份缓存
+    private static func symbolName(forAppPath appPath: String) -> String? {
+        if let cached = symbolNameCache.get(appPath) { return cached }
+        let bundleID = Bundle(url: URL(fileURLWithPath: appPath))?.bundleIdentifier
+        let name = bundleID.flatMap { symbolByBundleID[$0] }
+        symbolNameCache.set(appPath, name)
+        return name
+    }
 
     static func simpleIcon(forAppPath appPath: String?) -> NSImage? {
         guard let appPath, !appPath.isEmpty else { return nil }
-        if let cached = simpleIconCache.get(appPath) { return cached }
+        return simpleIcon(symbolName: symbolName(forAppPath: appPath))
+    }
 
-        let bundleID = Bundle(url: URL(fileURLWithPath: appPath))?.bundleIdentifier
-        let symbolName = bundleID.flatMap { symbolByBundleID[$0] }
+    /// 每次调用现做 NSImage（颜色与缓存策略见 MenuSymbolIcon 注释）
+    private static func simpleIcon(symbolName: String?) -> NSImage? {
+        guard let symbolName else { return nil }  // 未收录：简单档回落原始图标（由调用方处理）
+        return MenuSymbolIcon.image(named: symbolName, pointSize: 16)
+    }
 
-        let image: NSImage?
-        if let symbolName {
-            // 用 labelColor 调色板而非 isTemplate：FinderSync 菜单由 Finder 跨进程渲染，
-            // template 位图不会跟随外观（暗色模式下是黑色）；labelColor 在绘制时解析，明暗自适应
-            let config = NSImage.SymbolConfiguration(paletteColors: [.labelColor])
-                .applying(NSImage.SymbolConfiguration(pointSize: 16, weight: .regular))
-            image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
-                .withSymbolConfiguration(config)
-        } else {
-            image = nil  // 未收录：简单档回落原始图标（由调用方处理）
-        }
-        simpleIconCache.set(appPath, image)
-        return image
+    /// 后台预热（配置到达时调用，避免磁盘读取落在首次菜单构建）：
+    /// 1. symbol 名查表（每个未收录路径要读一次 Info.plist）
+    /// 2. 创建一个 symbol 图像，触发 SF Symbol 渲染管线初始化（首次约 5ms）
+    static func prewarm(forAppPaths paths: [String]) {
+        for path in paths { _ = symbolName(forAppPath: path) }
+        _ = MenuSymbolIcon.image(named: "folder", pointSize: 16)
     }
 
     /// 应用路径对应的预设显示名（设置页标记「来自预设」时可用，当前仅预留）
@@ -112,18 +118,18 @@ enum AppPresets {
     }
 }
 
-/// NSLock 保护的 NSImage? 缓存（nil 也要缓存：未收录应用不必反复读 Info.plist）
-private final class LockedSimpleIconCache: @unchecked Sendable {
+/// NSLock 保护的 String? 缓存（nil 也要缓存：未收录应用不必反复读 Info.plist）
+private final class LockedSymbolNameCache: @unchecked Sendable {
     private let lock = NSLock()
-    private var storage: [String: NSImage?] = [:]
+    private var storage: [String: String?] = [:]
 
-    func get(_ key: String) -> NSImage?? {
+    func get(_ key: String) -> String?? {
         lock.lock()
         defer { lock.unlock() }
         return storage[key]
     }
 
-    func set(_ key: String, _ value: NSImage?) {
+    func set(_ key: String, _ value: String?) {
         lock.lock()
         defer { lock.unlock() }
         storage[key] = .some(value)
