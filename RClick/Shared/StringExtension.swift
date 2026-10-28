@@ -94,7 +94,7 @@ extension String {
 
 extension UserDefaults {
     static let group: UserDefaults = {
-        if let suite = UserDefaults(suiteName: "group.cn.wflixu.RClick") {
+        if let suite = UserDefaults(suiteName: "group.xr.cn.wflixu.RClick") {
             return suite
         }
         return .standard

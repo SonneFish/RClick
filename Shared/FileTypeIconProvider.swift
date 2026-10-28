@@ -111,7 +111,7 @@ final class FileTypeIconProvider: @unchecked Sendable {
 
     /// 从主 App Bundle 加载 PNG 图标（用户自定义图标）
     private func pngIcon(for name: String) -> NSImage? {
-        guard let appBundle = Bundle(identifier: "cn.wflixu.RClick"),
+        guard let appBundle = Bundle(identifier: "xr.cn.wflixu.RClick"),
               let image = appBundle.image(forResource: name) else {
             return nil
         }
