@@ -91,11 +91,13 @@ enum AppPresets {
         let symbolName = bundleID.flatMap { symbolByBundleID[$0] }
 
         let image: NSImage?
-        if let symbolName, let img = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil) {
-            let sized = img.copy() as! NSImage
-            sized.size = NSSize(width: 16, height: 16)
-            sized.isTemplate = true
-            image = sized
+        if let symbolName {
+            // 用 labelColor 调色板而非 isTemplate：FinderSync 菜单由 Finder 跨进程渲染，
+            // template 位图不会跟随外观（暗色模式下是黑色）；labelColor 在绘制时解析，明暗自适应
+            let config = NSImage.SymbolConfiguration(paletteColors: [.labelColor])
+                .applying(NSImage.SymbolConfiguration(pointSize: 16, weight: .regular))
+            image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+                .withSymbolConfiguration(config)
         } else {
             image = nil  // 未收录：简单档回落原始图标（由调用方处理）
         }
