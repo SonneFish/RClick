@@ -141,11 +141,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
 
+            // 扩展请求显示 toast（如"按住 ⌘ 再点击直接删除"的引导）
+            messager.onExtensionMessage(.toast) { [weak self] data in
+                guard let self = self else { return }
+                if let payload: ToastPayload = messager.decodeSignedData(data) {
+                    Task { @MainActor in
+                        ToastController.shared.show(AppLocalization.localized(payload.textKey))
+                    }
+                } else {
+                    logger.warning("Invalid toast payload")
+                }
+            }
+
             messager.onExtensionMessage(.heartbeat) { [weak self] _ in
                 guard let self = self else { return }
                 logger.debug("Received heartbeat from extension")
-                pluginRunning = true
-                sendMenuConfigurationUpdate()
+                // 心跳只做保活。此前每次心跳都全量推送配置，扩展端随之清空图标
+                // 缓存，导致每 10 秒后的第一次右键都要同步重建全部 App 图标。
+                // 配置变化由 .menuConfigShouldUpdate 通知驱动（AppState.persist
+                // 与自定义菜单 apply/delete 都会发）；这里仅在离线→在线的重连
+                // 瞬间补推一次，覆盖主程序重启后配置可能过期的情况。
+                if !pluginRunning {
+                    pluginRunning = true
+                    sendMenuConfigurationUpdate()
+                }
             }
 
             // 处理 Extension 请求菜单配置

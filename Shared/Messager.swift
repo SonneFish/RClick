@@ -33,6 +33,8 @@ enum ExtensionToMainAction: String, Codable {
     case heartbeat = "heartbeat"
     /// 请求菜单配置
     case requestConfig = "request-config"
+    /// 请求主程序显示 toast 提示
+    case toast = "toast"
 }
 
 // MARK: - 消息载荷
@@ -57,6 +59,8 @@ struct MenuConfigPayload: Codable {
     let newFilesCollapsed: Bool
     /// 是否折叠常用目录菜单（默认 true）
     let commonDirsCollapsed: Bool
+    /// 应用图标样式：0=无图标 1=简单图标（单色 template） 2=原始图标（默认）
+    let iconStyle: Int
     /// nil preserves the legacy layout; [] intentionally renders no items.
     var customMenu: [MenuNode]?
 
@@ -69,7 +73,8 @@ struct MenuConfigPayload: Codable {
         actionsCollapsed: Bool = false,
         appsCollapsed: Bool = false,
         newFilesCollapsed: Bool = true,
-        commonDirsCollapsed: Bool = true
+        commonDirsCollapsed: Bool = true,
+        iconStyle: Int = RCAppIconStyle.simple.rawValue
     ) {
         self.version = version
         self.actions = actions
@@ -80,6 +85,7 @@ struct MenuConfigPayload: Codable {
         self.appsCollapsed = appsCollapsed
         self.newFilesCollapsed = newFilesCollapsed
         self.commonDirsCollapsed = commonDirsCollapsed
+        self.iconStyle = iconStyle
     }
 }
 
@@ -108,6 +114,12 @@ struct ClickEventPayload: Codable {
 }
 
 // MARK: - 辅助类型
+
+/// Toast 提示消息载荷（扩展 → 主程序）
+struct ToastPayload: Codable {
+    /// 本地化 key，由主程序侧完成本地化显示
+    let textKey: String
+}
 
 /// 运行状态消息载荷（用于通知 Extension 主程序运行状态）
 struct RunningPayload: Codable {
@@ -402,6 +414,11 @@ class Messager: @unchecked Sendable {
     /// Extension 发送点击事件
     func sendClickEvent(_ event: ClickEventPayload) {
         sendToMain(.click, data: event)
+    }
+
+    /// Extension 请求主程序显示 toast 提示
+    func sendToastRequest(textKey: String) {
+        sendToMain(.toast, data: ToastPayload(textKey: textKey))
     }
 
     // MARK: - 解码辅助

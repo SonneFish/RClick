@@ -28,6 +28,10 @@ struct OpenWithApp: @MainActor RCBase {
     var environment: [String: String] = [:]
     /// 是否以新实例（新窗口）打开（对应 NSWorkspace.OpenConfiguration.createsNewApplicationInstance）
     var opensNewInstance = false
+    /// 是否在 Finder 自定义工具栏菜单中显示
+    var showInToolbar = true
+    /// 是否在右键菜单中显示
+    var showInContextMenu = true
 
     nonisolated var appName: String {
         FileManager.default.displayName(atPath: url.path)
@@ -292,13 +296,24 @@ struct AppMenuItem: Codable {
     let icon: String
     let tag: Int
     let appURL: String?  // 应用路径，用于获取应用图标
+    /// 是否以新实例打开（浏览器类 app 新开窗口而非新 tab）。
+    /// 扩展端快链路直接打开 App 时需要这个字段。
+    let opensNewInstance: Bool
+    /// 是否在 Finder 自定义工具栏菜单中显示
+    let showInToolbar: Bool
+    /// 是否在右键菜单中显示
+    let showInContextMenu: Bool
 
-    init(id: String, name: String, icon: String, tag: Int, appURL: String? = nil) {
+    init(id: String, name: String, icon: String, tag: Int, appURL: String? = nil, opensNewInstance: Bool = false,
+         showInToolbar: Bool = true, showInContextMenu: Bool = true) {
         self.id = id
         self.name = name
         self.icon = icon
         self.tag = tag
         self.appURL = appURL
+        self.opensNewInstance = opensNewInstance
+        self.showInToolbar = showInToolbar
+        self.showInContextMenu = showInContextMenu
     }
 }
 
@@ -383,7 +398,10 @@ extension OpenWithApp {
             name: name,
             icon: "app",
             tag: 0,
-            appURL: url.path
+            appURL: url.path,
+            opensNewInstance: opensNewInstance,
+            showInToolbar: showInToolbar,
+            showInContextMenu: showInContextMenu
         )
     }
 }
