@@ -32,6 +32,9 @@ struct OpenWithApp: @MainActor RCBase {
     var showInToolbar = true
     /// 是否在右键菜单中显示
     var showInContextMenu = true
+    /// 选中文件交给该应用时是否改为打开所在目录（终端类行为）
+    /// `nil` = 未手动设置，运行时按预设终端分类（AppPresets.terminalBundleIDs）兜底
+    var opensContainingDir: Bool? = nil
 
     nonisolated var appName: String {
         FileManager.default.displayName(atPath: url.path)

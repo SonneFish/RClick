@@ -55,6 +55,10 @@ struct AppsSettingsTabView: View {
                                 Toggle(AppLocalization.localized("Context Menu"), isOn: visibilityBinding(item, \.showInContextMenu))
                                     .toggleStyle(.checkbox)
                                     .controlSize(.small)
+                                Toggle(AppLocalization.localized("Open Containing Folder"), isOn: containingDirBinding(item))
+                                    .toggleStyle(.checkbox)
+                                    .controlSize(.small)
+                                    .help(AppLocalization.localized("When a file is selected, open its containing folder instead"))
 
                                 Button {
                                     editingApp = item
@@ -122,6 +126,23 @@ struct AppsSettingsTabView: View {
         .sheet(isPresented: $showPresetSheet) {
             PresetAppsSheetView(appState: appState)
         }
+    }
+
+    /// 「选中文件时打开所在目录」开关：未手动设置时按预设终端分类显示；
+    /// 一旦切换就写入显式值，之后不再跟随预设
+    private func containingDirBinding(_ item: OpenWithApp) -> Binding<Bool> {
+        Binding<Bool>(
+            get: { item.opensContainingDir ?? presetOpensContainingDir(item) },
+            set: { newValue in
+                appState.updateAppOpensContainingDir(id: item.id, value: newValue)
+            }
+        )
+    }
+
+    /// 预设终端分类兜底：应用 bundleID 在终端预设集合里则默认勾选
+    private func presetOpensContainingDir(_ item: OpenWithApp) -> Bool {
+        guard let bundleID = Bundle(url: item.url)?.bundleIdentifier else { return false }
+        return AppPresets.terminalBundleIDs.contains(bundleID)
     }
 
     /// 行内可见性开关的双向绑定：写入 AppState（persist 会自动广播菜单更新）
