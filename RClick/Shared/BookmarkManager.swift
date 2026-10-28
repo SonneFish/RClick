@@ -93,6 +93,11 @@ final class BookmarkManager: ObservableObject {
 
     /// 检查某个文件/目录是否在已授权的目录下
     func hasAccess(to url: URL) -> Bool {
+        // 主应用已去沙盒：进程本身即可访问用户文件，无需 bookmark 授权门控。
+        // （沙盒进程会被系统注入 APP_SANDBOX_CONTAINER_ID 环境变量）
+        if ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] == nil {
+            return true
+        }
         let target = url.resolvingSymlinksInPath()
         return authorizedDirectories.contains { Self.covers($0, target) }
     }
