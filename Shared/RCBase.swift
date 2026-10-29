@@ -306,9 +306,11 @@ struct AppMenuItem: Codable {
     let showInToolbar: Bool
     /// 是否在右键菜单中显示
     let showInContextMenu: Bool
+    /// 「选中文件时打开所在目录」显式开关；nil = 未手动设置（跟随预设终端分类）
+    let opensContainingDir: Bool?
 
     init(id: String, name: String, icon: String, tag: Int, appURL: String? = nil, opensNewInstance: Bool = false,
-         showInToolbar: Bool = true, showInContextMenu: Bool = true) {
+         showInToolbar: Bool = true, showInContextMenu: Bool = true, opensContainingDir: Bool? = nil) {
         self.id = id
         self.name = name
         self.icon = icon
@@ -317,6 +319,7 @@ struct AppMenuItem: Codable {
         self.opensNewInstance = opensNewInstance
         self.showInToolbar = showInToolbar
         self.showInContextMenu = showInContextMenu
+        self.opensContainingDir = opensContainingDir
     }
 }
 
@@ -404,7 +407,8 @@ extension OpenWithApp {
             appURL: url.path,
             opensNewInstance: opensNewInstance,
             showInToolbar: showInToolbar,
-            showInContextMenu: showInContextMenu
+            showInContextMenu: showInContextMenu,
+            opensContainingDir: opensContainingDir
         )
     }
 }
