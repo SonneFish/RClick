@@ -406,8 +406,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         // 如果缓存为空，触发请求并返回加载中的菜单
         guard let config = cachedMenuConfig else {
             if offline {
-                menu.addItem(withTitle: AppLocalization.localized("RClick is not running"), action: nil, keyEquivalent: "")
-                menu.addItem(withTitle: AppLocalization.localized("Restart RClick to restore the menu"), action: nil, keyEquivalent: "")
+                appendOfflineHint(menu, offline: true)
             } else {
                 requestMenuConfig()
                 menu.addItem(withTitle: AppLocalization.localized("RClick (loading...)"), action: nil, keyEquivalent: "")
@@ -529,14 +528,41 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         return menu
     }
 
-    /// 主程序离线时在菜单尾部追加持灰说明（快链路项不受影响，仍可点击）
+    /// 主程序离线时在菜单尾部追加持灰说明（快链路项不受影响，仍可点击）。
+    /// 两行提示均可点击：启动主程序（仅菜单栏常驻，不弹设置窗口）。
     private func appendOfflineHint(_ menu: NSMenu, offline: Bool) {
         guard offline else { return }
         menu.addItem(NSMenuItem.separator())
-        let first = menu.addItem(withTitle: AppLocalization.localized("RClick is not running"), action: nil, keyEquivalent: "")
-        first.isEnabled = false
-        let second = menu.addItem(withTitle: AppLocalization.localized("Restart RClick to restore the menu"), action: nil, keyEquivalent: "")
-        second.isEnabled = false
+        let gray = [NSAttributedString.Key.foregroundColor: NSColor.secondaryLabelColor]
+        let titles = [
+            AppLocalization.localized("RClick is not running"),
+            AppLocalization.localized("Restart RClick to restore the menu"),
+        ]
+        for title in titles {
+            let item = menu.addItem(withTitle: "", action: #selector(handleLaunchHostClick(_:)), keyEquivalent: "")
+            item.attributedTitle = NSAttributedString(string: title, attributes: gray)
+            item.target = self
+        }
+    }
+
+    /// 点击离线提示：启动主程序。不带任何文档 URL，纯启动不受 TCC 文件弹窗限制；
+    /// activates = false 不抢焦点。主程序以"启动时是否被激活"决定是否打开设置窗口，
+    /// 未激活（本场景）则静默启动，只有菜单栏图标。
+    @objc private func handleLaunchHostClick(_ sender: NSMenuItem) {
+        let hostURL = Bundle.main.bundleURL
+            .deletingLastPathComponent()   // PlugIns/
+            .deletingLastPathComponent()   // Contents/
+            .deletingLastPathComponent()   // RClick.app
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false
+        // RC_QUIET_LAUNCH=1：主程序据此静默启动（不打开设置窗口），
+        // 主程序是 LSUIElement 应用，无法靠激活状态区分启动来源
+        config.environment = ["RC_QUIET_LAUNCH": "1"]
+        NSWorkspace.shared.openApplication(at: hostURL, configuration: config) { _, error in
+            if let error {
+                logger.warning("Launch host app failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func makeActionItem(_ action: ActionMenuItem) -> NSMenuItem {
@@ -563,7 +589,8 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         item.tag = hashForApp(app)
         item.target = self
         item.image = appIcon(for: app)
-        // 打开 App 需要主程序执行，离线置灰
+        // 沙盒限制：扩展内 NSWorkspace.open 传递文件 URL 必触发 TCC 弹窗，
+        // 离线快开不可行，维持与主程序一致的离线置灰
         if !isHostAppRunning {
             item.isEnabled = false
         }
@@ -695,9 +722,8 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             itemPaths = [targetURL.path]
         }
 
-        // 打开 App 走主程序链路：扩展是沙盒进程，NSWorkspace.open 把用户文件/
-        // 目录交给其他 App 会触发 TCC 授权弹窗（"FinderSyncExt 没有权限打开…"），
-        // 且工具栏场景需要主程序配合。主程序已去沙盒，此链路无弹窗。
+        // 打开动作统一走主程序链路（bookmark 门控与授权重试都在主程序侧，
+        // 且实测无 TCC 弹窗）。扩展离线置灰由 makeAppItem 负责，不会走到这里。
         let event = ClickEventPayload(
             itemId: app.id,
             itemType: .app,
