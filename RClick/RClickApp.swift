@@ -15,6 +15,7 @@ import os.log
 
 extension NSNotification.Name {
     static let menuConfigShouldUpdate = NSNotification.Name("RClick.menuConfigShouldUpdate")
+    static let openSettingsRequested = NSNotification.Name("RClick.openSettingsRequested")
 }
 
 @main
@@ -45,11 +46,15 @@ struct RClickApp: App {
             .environmentObject(updateManager)
             .modelContainer(SharedDataManager.sharedModelContainer)
 
-        // showMenuBarExtra 为 true 时显示菜单条
+        // showMenuBarExtra 为 true 时显示菜单条。label 必须用自定义视图
+        // （MenuBarExtraLabel）：openSettingsRequested 的订阅挂在那里，默认的
+        // 字符串+图片标签里没有我们的代码可挂。
         MenuBarExtra(
-            "RClick", image: "MenuBar", isInserted: $showMenuBarExtra
+            isInserted: $showMenuBarExtra
         ) {
             MenuBarView()
+        } label: {
+            MenuBarExtraLabel()
         }
         .defaultAppStorage(.group)
     }
@@ -90,6 +95,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         logger.info("applicationDidFinishLaunching called")
+
+        // 设置窗口打开策略。注意 RClick 是 LSUIElement 应用，启动时系统不会
+        // 激活它（NSApp.isActive 恒为 false），无法用激活状态区分启动来源，
+        // 改用两个显式信号：
+        // - 扩展离线提示点击 → OpenConfiguration.environment 带 RC_QUIET_LAUNCH=1
+        // - 开机自启 → 系统运行时长 < 3 分钟（实测 SMAppService 登录项与手动
+        //   open 的 launchd 标签格式一致，环境变量无法区分，时长是唯一可用信号）
+        // 其余（手动 open/双击、崩溃后重启）→ 打开设置窗口
+        // App 已运行时再次 open 不会重跑本方法，由 applicationShouldHandleReopen
+        // 接住，同样打开设置窗口
+        // 时长判定仅在登录项开启时参与：用户没开自启就不存在"开机自启"场景，
+        // 开机后手动打开的行为与任何时刻一致
+        let processInfo = ProcessInfo.processInfo
+        let isHintClickLaunch = processInfo.environment["RC_QUIET_LAUNCH"] == "1"
+        let isBootLaunch = LaunchAtLogin.isEnabled && processInfo.systemUptime < 180
+        let willOpenSettings = !isHintClickLaunch && !isBootLaunch
+        logger.info("launch decision: hintClick=\(isHintClickLaunch, privacy: .public) bootLaunch=\(isBootLaunch, privacy: .public) uptime=\(Int(processInfo.systemUptime), privacy: .public)s openSettings=\(willOpenSettings, privacy: .public)")
+        if willOpenSettings {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(name: .openSettingsRequested, object: nil)
+            }
+        }
 
         // 监听菜单配置更新通知（设置页 toggle 动作时触发）
         NotificationCenter.default.addObserver(
@@ -185,6 +212,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
+    }
+
+    /// 拒绝 macOS 系统级窗口恢复：常驻后台工具，设置窗口只应由用户主动打开
+    /// （菜单栏图标 / 离线提示点击）。SwiftUI 的 restorationBehavior(.disabled)
+    /// 挡不住系统层的 savedState 还原，这里在 AppDelegate 层再拦一道。
+    func applicationShouldRestoreWindowState(_ sender: NSApplication) -> Bool {
+        return false
+    }
+
+    /// 用户在 App 已运行时再次打开（Finder 双击 / `open` 命令）：launch 流程不会
+    /// 重跑，applicationDidFinishLaunching 不再执行——这正是"App 明明开着，
+    /// 再点一次却什么都没发生"的原因。这里把它转成与首次手动启动一致的行为：
+    /// 调出设置窗口。订阅方是 MenuBarExtra 的标签视图（MenuBarExtraLabel），
+    /// 它从启动起就存在。
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        logger.info("reopen: hasVisibleWindows=\(flag, privacy: .public)")
+        NotificationCenter.default.post(name: .openSettingsRequested, object: nil)
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
