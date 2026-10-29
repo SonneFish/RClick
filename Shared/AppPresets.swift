@@ -111,6 +111,28 @@ enum AppPresets {
         _ = MenuSymbolIcon.image(named: "folder", pointSize: 16)
     }
 
+    /// 「用指定应用打开」的目标解析（主程序 ActionService 与扩展快链路共用）：
+    /// 「选中文件时打开所在目录」——每应用显式开关优先，未手动设置时按预设终端分类兜底；
+    /// 编辑器 / Git 客户端等保持原样（打开文件本身才是预期）。
+    /// 返回 (原始路径（供日志）, 解析后的目标 URL)。
+    static func resolveOpenTargets(
+        appPath: String?, explicit: Bool?, targetPaths: [String]
+    ) -> [(path: String, url: URL)] {
+        let bundleID = appPath.flatMap { Bundle(url: URL(fileURLWithPath: $0))?.bundleIdentifier }
+        let opensContainingDir = explicit ?? bundleID.map { terminalBundleIDs.contains($0) } ?? false
+        return targetPaths.map { raw in
+            let decoded = raw.removingPercentEncoding ?? raw
+            var url = URL(fileURLWithPath: decoded)
+            if opensContainingDir {
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue {
+                    url = url.deletingLastPathComponent()
+                }
+            }
+            return (decoded, url)
+        }
+    }
+
     /// 应用路径对应的预设显示名（设置页标记「来自预设」时可用，当前仅预留）
     static func presetName(forAppPath appPath: String) -> String? {
         guard let bundleID = Bundle(url: URL(fileURLWithPath: appPath))?.bundleIdentifier else { return nil }
