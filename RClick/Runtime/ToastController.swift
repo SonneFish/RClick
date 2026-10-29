@@ -64,13 +64,14 @@ final class ToastController {
     private func updateContent(of panel: NSPanel, message: String) {
         let text = NSTextField(labelWithString: message)
         text.font = .systemFont(ofSize: 15, weight: .semibold)
-        // HUD 深色材质上固定用白字，明暗模式下都醒目
-        text.textColor = .white
+        // 动态 labelColor：浅色模式深字、深色模式浅字，跟随系统外观自动切换
+        text.textColor = .labelColor
         text.translatesAutoresizingMaskIntoConstraints = false
 
         let effect = NSVisualEffectView()
-        // 系统 HUD 材质：深色高对比，无论系统明暗模式都够醒目
-        effect.material = .hudWindow
+        // popover 材质跟随系统明暗模式，与 labelColor 同步变化：
+        // 浅色下浅底深字，深色下深底浅字
+        effect.material = .popover
         effect.state = .active
         effect.wantsLayer = true
         effect.layer?.cornerRadius = 14
