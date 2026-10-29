@@ -99,7 +99,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 设置窗口打开策略。注意 RClick 是 LSUIElement 应用，启动时系统不会
         // 激活它（NSApp.isActive 恒为 false），无法用激活状态区分启动来源，
         // 改用两个显式信号：
-        // - 扩展离线提示点击 → OpenConfiguration.environment 带 RC_QUIET_LAUNCH=1
+        // - 扩展离线提示点击 → OpenConfiguration.environment 带 RC_QUIET_LAUNCH=1，
+        //   外加 HintClickLaunch 时间戳（环境变量对已运行的 App 无效，见其注释）
         // - 开机自启 → 系统运行时长 < 3 分钟（实测 SMAppService 登录项与手动
         //   open 的 launchd 标签格式一致，环境变量无法区分，时长是唯一可用信号）
         // 其余（手动 open/双击、崩溃后重启）→ 打开设置窗口
@@ -108,7 +109,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 时长判定仅在登录项开启时参与：用户没开自启就不存在"开机自启"场景，
         // 开机后手动打开的行为与任何时刻一致
         let processInfo = ProcessInfo.processInfo
-        let isHintClickLaunch = processInfo.environment["RC_QUIET_LAUNCH"] == "1"
+        let isHintClickLaunch = processInfo.environment["RC_QUIET_LAUNCH"] == "1" || HintClickLaunch.isRecent()
         let isBootLaunch = LaunchAtLogin.isEnabled && processInfo.systemUptime < 180
         let willOpenSettings = !isHintClickLaunch && !isBootLaunch
         logger.info("launch decision: hintClick=\(isHintClickLaunch, privacy: .public) bootLaunch=\(isBootLaunch, privacy: .public) uptime=\(Int(processInfo.systemUptime), privacy: .public)s openSettings=\(willOpenSettings, privacy: .public)")
@@ -227,6 +228,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 调出设置窗口。订阅方是 MenuBarExtra 的标签视图（MenuBarExtraLabel），
     /// 它从启动起就存在。
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // 提示点击落在「App 已在运行 / 正在退出收尾」的窗口里时，系统忽略
+        // RC_QUIET_LAUNCH 环境变量、只派发 reopen——时间戳是识别这种点击的唯一
+        // 信号，此时保持静默，不把设置页弹出来
+        if HintClickLaunch.isRecent() {
+            logger.info("reopen suppressed: recent hint-click launch")
+            return true
+        }
         logger.info("reopen: hasVisibleWindows=\(flag, privacy: .public)")
         NotificationCenter.default.post(name: .openSettingsRequested, object: nil)
         return true

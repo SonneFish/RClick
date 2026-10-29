@@ -546,8 +546,8 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
     }
 
     /// 点击离线提示：启动主程序。不带任何文档 URL，纯启动不受 TCC 文件弹窗限制；
-    /// activates = false 不抢焦点。主程序以"启动时是否被激活"决定是否打开设置窗口，
-    /// 未激活（本场景）则静默启动，只有菜单栏图标。
+    /// activates = false 不抢焦点。主程序对这种启动保持静默（不打开设置窗口），
+    /// 识别信号见 HintClickLaunch。
     @objc private func handleLaunchHostClick(_ sender: NSMenuItem) {
         let hostURL = Bundle.main.bundleURL
             .deletingLastPathComponent()   // PlugIns/
@@ -555,9 +555,11 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             .deletingLastPathComponent()   // RClick.app
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
-        // RC_QUIET_LAUNCH=1：主程序据此静默启动（不打开设置窗口），
-        // 主程序是 LSUIElement 应用，无法靠激活状态区分启动来源
+        // RC_QUIET_LAUNCH=1 只在「本次真的拉起新进程」时送达主程序；App 已在运行
+        // （刚点过退出还没退完、或启动后菜单尚未刷新）时系统会忽略环境变量、只
+        // 派发 reopen——所以同时写一个时间戳，主程序在两条路径上都能识别提示点击
         config.environment = ["RC_QUIET_LAUNCH": "1"]
+        HintClickLaunch.mark()
         NSWorkspace.shared.openApplication(at: hostURL, configuration: config) { _, error in
             if let error {
                 logger.warning("Launch host app failed: \(error.localizedDescription, privacy: .public)")
