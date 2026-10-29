@@ -52,12 +52,15 @@ struct AppsSettingsTabView: View {
                                 Toggle(AppLocalization.localized("Toolbar"), isOn: visibilityBinding(item, \.showInToolbar))
                                     .toggleStyle(.checkbox)
                                     .controlSize(.small)
+                                    .fixedSize()
                                 Toggle(AppLocalization.localized("Context Menu"), isOn: visibilityBinding(item, \.showInContextMenu))
                                     .toggleStyle(.checkbox)
                                     .controlSize(.small)
+                                    .fixedSize()
                                 Toggle(AppLocalization.localized("Open Containing Folder"), isOn: containingDirBinding(item))
                                     .toggleStyle(.checkbox)
                                     .controlSize(.small)
+                                    .fixedSize()
                                     .help(AppLocalization.localized("When a file is selected, open its containing folder instead"))
 
                                 Button {
@@ -86,10 +89,14 @@ struct AppsSettingsTabView: View {
                                     .frame(width: 24, height: 24)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.name)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
                                     if !item.arguments.isEmpty || !item.environment.isEmpty {
                                         Text(appSummary(item))
                                             .font(.caption)
                                             .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
                                     }
                                 }
                             }
