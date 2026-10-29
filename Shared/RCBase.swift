@@ -412,3 +412,38 @@ extension OpenWithApp {
         )
     }
 }
+
+/// 「离线提示点击启动」标记，经 App Group 容器在扩展与主程序之间传递。
+///
+/// 扩展在拉起主程序前触碰标记文件；主程序据此识别这次启动/reopen 来自提示点击，
+/// 保持静默（不打开设置窗口）。两个设计决定：
+/// - 用文件而非 UserDefaults suite：suite 在沙盒扩展与非沙盒主程序里分别映射到
+///   Group Container 和 ~/Library/Preferences 下两个不同文件，跨端不可见；容器
+///   目录是两端确定共享的空间（SwiftData 数据库已在此机制上运行）。
+/// - 用文件修改时间而非内容：触碰即标记，无需解析、无需原子写。
+enum HintClickLaunch {
+    /// 覆盖「退出收尾约 1 秒、启动后菜单刷新前 1-2 秒」空窗的判定窗口
+    static let window: TimeInterval = 5
+
+    private static var fileURL: URL? {
+        // 与主程序侧 Constants.suitName 一致；Shared/ 同时编译进扩展，
+        // 引用不到那个常量
+        FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.xr.cn.wflixu.RClick")?
+            .appendingPathComponent("hintClickLaunchAt")
+    }
+
+    /// 扩展侧：拉起主程序前调用
+    static func mark() {
+        guard let url = fileURL else { return }
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+    }
+
+    /// 主程序侧：是否处于提示点击后的静默窗口
+    static func isRecent(now: Date = Date()) -> Bool {
+        guard let url = fileURL,
+              let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modifiedAt = attributes[.modificationDate] as? Date
+        else { return false }
+        return now.timeIntervalSince(modifiedAt) < window
+    }
+}
