@@ -31,6 +31,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Removed
 - The `custom_menu.json` layout and the Settings → General → Custom Menu controls. The menu is now always built from the apps, actions, new-file types and common folders configured in Settings
 
+- Built-in app presets, per-app toolbar and context-menu visibility, and none/simple/original app icon styles
+- A per-app automatic/on/off option for opening a selected file's containing folder, enabled automatically for terminal presets
+- Offline Copy Path and a clickable offline hint that relaunches RClick quietly
+
+### Changed
+- Keep Finder icon caches warm, preload workspace icon lookups, and cache SF Symbols separately for light and dark appearances
+- Reply to heartbeats without rebuilding or re-sending unchanged menu configurations
+- Open settings on manual launches and reopens, while keeping hint-triggered and detected login launches quiet
+
+### Fixed
+- Preserve compatibility with menu payloads created before icon styles and per-app visibility were introduced
+- Correct the shared App Group used by the quiet-launch marker
+- Refresh permission status while settings are visible and update System Settings links
+- Complete preset/settings translations and distinguish missing translations from English values equal to their keys
+
 ## [2.3.1] - 2026-10-14
 
 ### Fixed

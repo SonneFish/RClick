@@ -259,12 +259,15 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             let warmedFiles = newFiles.isEmpty
                 ? [:]
                 : FileTypeIconProvider.shared.computeWorkspaceIcons(forExts: newFiles.map { $0.ext })
+            // Background work only reads bundle metadata; render symbols on main below.
+            AppPresets.prewarm(forAppPaths: apps.compactMap { $0.appURL })
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 for (key, icon) in warmed where self.iconCache[key] == nil {
                     self.iconCache[key] = icon
                 }
                 FileTypeIconProvider.shared.mergeWarmedIcons(warmedFiles)
+                for app in apps { _ = AppPresets.simpleIcon(forAppPath: app.appURL) }
                 logger.debug("图标预热完成: app \(warmed.count) 项, file \(warmedFiles.count) 项")
             }
         }

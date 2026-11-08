@@ -34,5 +34,5 @@ enum HintClickLaunch {
 
 /// Shared by both targets so launch markers and the host settings use one ID.
 nonisolated enum SharedAppGroup {
-    static let identifier = "group.cn.wflixu.RClick"
+    static let identifier = "group.xr.cn.wflixu.RClick"
 }
